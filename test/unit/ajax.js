@@ -60,6 +60,119 @@ module( "ajax", {
 		}
 	});
 
+	ajaxTest( "jQuery.ajax() - do not execute js (crossOrigin)", 2, function() {
+		return {
+			create: function( options ) {
+				options.crossDomain = true;
+				return jQuery.ajax( url("data/script.php?header=ecma"), options );
+			},
+			success: function() {
+				ok( true, "success" );
+			},
+			complete: function() {
+				ok( true, "complete" );
+			}
+		};
+	});
+
+	ajaxTest( "jQuery.ajax() - execute js for crossOrigin when dataType option is provided", 3,
+		function() {
+			return {
+				create: function( options ) {
+					options.crossDomain = true;
+					options.dataType = "script";
+					return jQuery.ajax( url("data/script.php?header=ecma"), options );
+				},
+				success: function() {
+					ok( true, "success" );
+				},
+				complete: function() {
+					ok( true, "complete" );
+				}
+			};
+		}
+	);
+
+	ajaxTest( "jQuery.ajax() - do not execute js (crossOrigin)", 2, function() {
+		return {
+			create: function( options ) {
+				options.crossDomain = true;
+				return jQuery.ajax( url("data/script.php"), options );
+			},
+			success: function() {
+				ok( true, "success" );
+			},
+			complete: function() {
+				ok( true, "complete" );
+			}
+		};
+	});
+
+	ajaxTest( "jQuery.ajax() - do not eval js (crossOrigin, no dataType) - gh-2432", 4,
+		function() {
+			var globalEval = jQuery.globalEval,
+				evaluated = false;
+			return {
+				setup: function() {
+					jQuery.globalEval = function() {
+						evaluated = true;
+						return globalEval.apply( this, arguments );
+					};
+				},
+				teardown: function() {
+					jQuery.globalEval = globalEval;
+				},
+				create: function( options ) {
+					options.crossDomain = true;
+					return jQuery.ajax( url("data/script.php?header=ecma"), options );
+				},
+				success: function( data ) {
+					ok( !evaluated, "cross-domain script response was not evaluated" );
+					strictEqual( typeof data, "string", "response was delivered as text" );
+					ok( /Script executed correctly/.test( data ), "response body returned verbatim" );
+				},
+				complete: function() {
+					ok( true, "complete" );
+				}
+			};
+		}
+	);
+
+	// Positive control for the test above: re-enabling script content sniffing for a
+	// single cross-domain request reproduces the pre-fix behavior, so the assertion
+	// on jQuery.globalEval above is known to detect the vulnerable code path
+	ajaxTest( "jQuery.ajax() - crossOrigin js is only eval'd without the gh-2432 guard", 4,
+		function() {
+			var globalEval = jQuery.globalEval,
+				evaluated = false;
+			return {
+				setup: function() {
+					jQuery.globalEval = function() {
+						evaluated = true;
+						return globalEval.apply( this, arguments );
+					};
+				},
+				teardown: function() {
+					jQuery.globalEval = globalEval;
+				},
+				create: function( options ) {
+					options.crossDomain = true;
+					return jQuery.ajax( url("data/script.php?header=ecma"), options );
+				},
+				beforeSend: function( jqXHR, s ) {
+					s.contents.script = /(?:java|ecma)script/;
+				},
+				success: function() {
+					ok( evaluated, "unguarded cross-domain response is evaluated" );
+					ok( true, "success" );
+				},
+				complete: function() {
+					ok( true, "complete" );
+				}
+			};
+		}
+	);
+
 	ajaxTest( "jQuery.ajax() - success callbacks (late binding)", 8, {
 		setup: addGlobalEvents("ajaxStart ajaxStop ajaxSend ajaxComplete ajaxSuccess"),
 		url: url("data/name.html"),
