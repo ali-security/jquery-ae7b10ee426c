@@ -1,3 +1,20 @@
 language: node_js
 node_js:
 - '0.10'
+addons:
+  chrome: stable
+script:
+# The project's own CI command: jsonlint, the concat build, JSHint/JSCS and uglify.
+- npm test
+# jQuery 1.11.1's unit suite is the browser page test/index.html, which upstream
+# drove through the now-defunct TestSwarm. Run it here in headless Chrome: the
+# ajax module needs a PHP-capable server, and the runner needs a modern Node, so
+# both are set up after the Node 0.10 build above has finished.
+- if ! command -v php > /dev/null; then sudo apt-get update -qq && sudo apt-get install -y php-cli; fi
+- php -S 127.0.0.1:8099 -t . > /tmp/php-server.log 2>&1 &
+- sleep 5
+- nvm install 18
+- nvm use 18
+- node --version
+- npm install --no-save puppeteer-core@23
+- CHROME_BIN=$(which google-chrome || which google-chrome-stable) node .github/qunit-runner.js http://127.0.0.1:8099/test/index.html

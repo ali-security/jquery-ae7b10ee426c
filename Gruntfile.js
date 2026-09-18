@@ -10,7 +10,14 @@ module.exports = function( grunt ) {
 	}
 
 	var gzip = require( "gzip-js" ),
-		srcHintOptions = readOptionalJSON( "src/.jshintrc" );
+		srcHintOptions = readOptionalJSON( "src/.jshintrc" ),
+
+		// Reproducible builds: when SOURCE_DATE_EPOCH is exported, the banners
+		// are stamped from it instead of from the wall clock.
+		buildDate = process.env.SOURCE_DATE_EPOCH ?
+			new Date( process.env.SOURCE_DATE_EPOCH * 1000 ) :
+			new Date(),
+		buildYear = buildDate.getUTCFullYear();
 
 	// The concatenated file won't pass onevar
 	// But our modules can
@@ -19,6 +26,7 @@ module.exports = function( grunt ) {
 	grunt.initConfig({
 		pkg: grunt.file.readJSON( "package.json" ),
 		dst: readOptionalJSON( "dist/.destination.json" ),
+		buildYear: buildYear,
 		compare_size: {
 			files: [ "dist/jquery.js", "dist/jquery.min.js" ],
 			options: {
@@ -122,7 +130,7 @@ module.exports = function( grunt ) {
 						ascii_only: true
 					},
 					banner: "/*! jQuery v<%= pkg.version %> | " +
-						"(c) 2005, <%= grunt.template.today('yyyy') %> jQuery Foundation, Inc. | " +
+						"(c) 2005, <%= buildYear %> jQuery Foundation, Inc. | " +
 						"jquery.org/license */",
 					compress: {
 						hoist_funs: false,
@@ -146,6 +154,20 @@ module.exports = function( grunt ) {
 	// Short list as a high frequency watch task
 	grunt.registerTask( "dev", [ "build:*:*", "lint" ] );
 
+	// Rewrite the "Date:" banner line that build/tasks/build.js stamps from the
+	// wall clock, so an exported SOURCE_DATE_EPOCH yields a reproducible file.
+	grunt.registerTask( "stampDate", function() {
+		var file = "dist/jquery.js";
+
+		if ( !process.env.SOURCE_DATE_EPOCH ) {
+			return;
+		}
+
+		grunt.file.write( file, grunt.file.read( file ).replace( /^ \* Date: .*$/m,
+			" * Date: " + buildDate.toISOString().replace( /:\d+\.\d+Z$/, "Z" ) ) );
+	} );
+
 	// Default grunt
-	grunt.registerTask( "default", [ "jsonlint", "dev", "uglify", "dist:*", "compare_size" ] );
+	grunt.registerTask( "default",
+		[ "jsonlint", "dev", "stampDate", "uglify", "dist:*", "compare_size" ] );
 };

@@ -1,0 +1,40 @@
+name: build-and-pack
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pack:
+    name: Build dist and pack npm tarball
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and pack inside node:0.10-wheezy
+        run: |
+          docker run --rm -v "$PWD":/src -w /src \
+            -e SOURCE_DATE_EPOCH=1398966120 \
+            node:0.10-wheezy sh -c '
+              set -e
+              node -v
+              npm -v
+              npm config set registry https://:2014-05-01T18%3A05%3A32.863Z@time-machines-npm.sealsecurity.io/
+              npm config set strict-ssl false
+              npm install
+              ./node_modules/.bin/grunt
+              node .github/release-copies.js
+              rm -rf .github node_modules
+              npm pack
+            '
+
+      - name: Show tarball contents
+        run: tar tzvf jquery-1.11.1.tgz
+
+      - name: Upload npm tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          path: jquery-1.11.1.tgz
+          if-no-files-found: error
